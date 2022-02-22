@@ -2,7 +2,7 @@
 .PHONY: all gcc-initial binutils
 
 TARGET = i686-kronos-linux-gnu
-ARCH = i368
+ARCH = x86
 
 WORK_DIR = $(CURDIR)/work
 DL_DIR = $(WORK_DIR)/downloads
@@ -23,8 +23,11 @@ GCC_URL = https://ftp.gnu.org/gnu/gcc/gcc-$(GCC_VERSION)/$(GCC_ARCHIVE)
 GCC_SRC = $(SRC_DIR)/gcc-$(GCC_VERSION)
 GCC_INITIAL_BUILD = $(BUILD_DIR)/gcc-initial
 
+KERNEL_SRC = $(SRC_DIR)/linux-kronos
+KERNEL_REPO = https://github.com/cgudrian/linux-kronos.git
 
-all: binutils gcc-initial
+
+all: binutils gcc-initial $(SYSROOT)/.linux-headers
 
 
 %/.dir:
@@ -113,6 +116,26 @@ $(TOOLS_DIR)/.gcc-initial: $(GCC_INITIAL_BUILD)/.built
 	cd $(GCC_INITIAL_BUILD) && \
 		PATH=$(TOOLS_DIR)/bin:$$PATH \
 		$(MAKE) install > /dev/null
+	touch $@
+
+# Kernel: download
+$(DL_DIR)/linux-kronos.git/HEAD: $(DL_DIR)/.dir
+	echo "Cloning Linux repository"
+	git clone --bare --quiet $(KERNEL_REPO) $(DL_DIR)/linux-kronos.git
+
+# Kernel: clone to src
+$(KERNEL_SRC)/.git/HEAD: $(DL_DIR)/linux-kronos.git/HEAD
+	echo "Checking out Kernel sources"
+	git clone --quiet $(DL_DIR)/linux-kronos.git $(KERNEL_SRC)
+
+# Kernel install
+$(SYSROOT)/.linux-headers: $(KERNEL_SRC)/.git/HEAD
+	echo "Installing Linux headers"
+	cd $(KERNEL_SRC) && \
+		PATH=$(TOOLS_DIR)/bin:$$PATH \
+		$(MAKE) headers_install \
+			ARCH=$(ARCH) CROSS_COMPILE=$(TARGET)- \
+			INSTALL_HDR_PATH=$(SYSROOT)/usr > /dev/null 2>&1
 	touch $@
 
 gcc-clean:
