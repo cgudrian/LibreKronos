@@ -4,33 +4,34 @@
 TARGET = i686-kronos-linux-gnu
 ARCH = x86
 
-PATCH_DIR = $(CURDIR)/patches
-WORK_DIR = $(CURDIR)/work
-DL_DIR = $(WORK_DIR)/downloads
-SRC_DIR = $(WORK_DIR)/src
-BUILD_DIR = $(WORK_DIR)/build
-TOOLS_DIR = $(WORK_DIR)/tools
-SYSROOT = $(WORK_DIR)/sysroot
+PATCHES = $(CURDIR)/patches
+WORK = $(CURDIR)/work
+DL = $(WORK)/downloads
+SRC = $(WORK)/src
+BUILD_DIR = $(WORK)/build
+TOOLS = $(WORK)/tools
+SYSROOT = $(WORK)/sysroot
 
 BINUTILS_VERSION = 2.21.1
 BINUTILS_ARCHIVE = binutils-$(BINUTILS_VERSION).tar.bz2
 BINUTILS_URL = https://ftp.gnu.org/gnu/binutils/$(BINUTILS_ARCHIVE)
-BINUTILS_SRC = $(SRC_DIR)/binutils-$(BINUTILS_VERSION)
+BINUTILS_SRC = $(SRC)/binutils-$(BINUTILS_VERSION)
 BINUTILS_BUILD = $(BUILD_DIR)/binutils
 
 GCC_VERSION = 4.5.0
 GCC_ARCHIVE = gcc-$(GCC_VERSION).tar.bz2
 GCC_URL = https://ftp.gnu.org/gnu/gcc/gcc-$(GCC_VERSION)/$(GCC_ARCHIVE)
-GCC_SRC = $(SRC_DIR)/gcc-$(GCC_VERSION)
+GCC_SRC = $(SRC)/gcc-$(GCC_VERSION)
 GCC_INITIAL_BUILD = $(BUILD_DIR)/gcc-initial
+GCC_INTERMEDIATE_BUILD = $(BUILD_DIR)/gcc-intermediate
 
 GLIBC_VERSION = 2.13
 GLIBC_ARCHIVE = glibc-$(GLIBC_VERSION).tar.bz2
 GLIBC_URL = https://ftp.gnu.org/gnu/glibc/$(GLIBC_ARCHIVE)
-GLIBC_SRC = $(SRC_DIR)/glibc-$(GLIBC_VERSION)
+GLIBC_SRC = $(SRC)/glibc-$(GLIBC_VERSION)
 GLIBC_INITIAL_BUILD = $(BUILD_DIR)/glibc-initial
 
-KERNEL_SRC = $(SRC_DIR)/linux-kronos
+KERNEL_SRC = $(SRC)/linux-kronos
 KERNEL_REPO = https://github.com/cgudrian/linux-kronos.git
 
 
@@ -43,25 +44,25 @@ all: binutils gcc-initial $(SYSROOT)/.linux-headers
 
 # Newer versions of makeinfo choke on the outdated GCC documentation.
 # GCC builds fine with a dummy makeinfo.
-$(TOOLS_DIR)/bin/makeinfo: $(TOOLS_DIR)/bin/.dir
-	ln -sf $$(which true) $(TOOLS_DIR)/bin/makeinfo
+$(TOOLS)/bin/makeinfo: $(TOOLS)/bin/.dir
+	ln -sf $$(which true) $(TOOLS)/bin/makeinfo
 
 #####################################################################
 # Binutils
 #####################################################################
 
-binutils: $(TOOLS_DIR)/.binutils
+binutils: $(TOOLS)/.binutils
 
 # binutils: download
-$(DL_DIR)/$(BINUTILS_ARCHIVE): $(DL_DIR)/.dir
+$(DL)/$(BINUTILS_ARCHIVE): $(DL)/.dir
 	echo "Downloading Binutils"
-	wget --quiet -O $(DL_DIR)/$(BINUTILS_ARCHIVE) "$(BINUTILS_URL)"
+	wget --quiet -O $(DL)/$(BINUTILS_ARCHIVE) "$(BINUTILS_URL)"
 	touch $@
 
 # binutils: extract
-$(BINUTILS_SRC): $(DL_DIR)/$(BINUTILS_ARCHIVE) $(SRC_DIR)/.dir
+$(BINUTILS_SRC): $(DL)/$(BINUTILS_ARCHIVE) $(SRC)/.dir
 	echo "Extracting Binutils"
-	(cd $(SRC_DIR) && tar xvf $<) > /dev/null
+	(cd $(SRC) && tar xvf $<) > /dev/null
 	touch $@
 
 # binutils: configure
@@ -71,7 +72,7 @@ $(BINUTILS_BUILD)/.configured: $(BINUTILS_BUILD)/.dir $(BINUTILS_SRC)
 	$(BINUTILS_SRC)/configure \
 		--disable-werror \
 		--target=$(TARGET) \
-		--prefix=$(TOOLS_DIR) \
+		--prefix=$(TOOLS) \
 		--with-sysroot=$(SYSROOT) \
 	> /dev/null
 	touch $@
@@ -83,7 +84,7 @@ $(BINUTILS_BUILD)/.built: $(BINUTILS_BUILD)/.configured
 	touch $@
 
 # binutils: install
-$(TOOLS_DIR)/.binutils: $(BINUTILS_BUILD)/.built
+$(TOOLS)/.binutils: $(BINUTILS_BUILD)/.built
 	echo "Installing Binutils"
 	cd $(BINUTILS_BUILD) && make install > /dev/null
 	touch $@
@@ -96,27 +97,27 @@ binutils-clean:
 # GCC
 #####################################################################
 
-gcc-initial: $(TOOLS_DIR)/.gcc-initial
+gcc-intermediate: $(TOOLS)/.gcc-intermediate
 
 # GCC: download
-$(DL_DIR)/$(GCC_ARCHIVE): $(DL_DIR)/.dir
+$(DL)/$(GCC_ARCHIVE): $(DL)/.dir
 	echo "Downloading GCC"
-	wget --quiet -O $(DL_DIR)/$(GCC_ARCHIVE) "$(GCC_URL)"
+	wget --quiet -O $(DL)/$(GCC_ARCHIVE) "$(GCC_URL)"
 	touch $@
 
 # GCC: extract
-$(GCC_SRC): $(DL_DIR)/$(GCC_ARCHIVE) $(SRC_DIR)/.dir
+$(GCC_SRC): $(DL)/$(GCC_ARCHIVE) $(SRC)/.dir
 	echo "Extracting GCC"
-	cd $(SRC_DIR) && tar xvf $< > /dev/null
+	cd $(SRC) && tar xvf $< > /dev/null
 	touch $@
 
 # Initial GCC: configure
-$(GCC_INITIAL_BUILD)/.configured: $(GCC_INITIAL_BUILD)/.dir $(GCC_SRC) $(TOOLS_DIR)/.binutils $(TOOLS_DIR)/bin/makeinfo
-	echo "Configuring GCC"
+$(GCC_INITIAL_BUILD)/.configured: $(GCC_INITIAL_BUILD)/.dir $(GCC_SRC) $(TOOLS)/.binutils $(TOOLS)/bin/makeinfo
+	echo "Configuring Initial GCC"
 	cd $(GCC_INITIAL_BUILD) && \
 	$(GCC_SRC)/configure \
 		--target=$(TARGET) \
-		--prefix=$(TOOLS_DIR) \
+		--prefix=$(TOOLS) \
 		--disable-nls \
 		--without-headers --with-newlib \
 		--disable-shared --disable-threads --disable-libssp \
@@ -130,18 +131,44 @@ $(GCC_INITIAL_BUILD)/.configured: $(GCC_INITIAL_BUILD)/.dir $(GCC_SRC) $(TOOLS_D
 $(GCC_INITIAL_BUILD)/.built: $(GCC_INITIAL_BUILD)/.configured
 	echo "Building Initial GCC"
 	cd $(GCC_INITIAL_BUILD) && \
-	PATH=$(TOOLS_DIR)/bin:$$PATH \
-	$(MAKE) \
-	> build.log 2>&1
+	PATH=$(TOOLS)/bin:$$PATH $(MAKE) > build.log 2>&1
 	touch $@
 
 # Initial GCC: install
-$(TOOLS_DIR)/.gcc-initial: $(GCC_INITIAL_BUILD)/.built
+$(TOOLS)/.gcc-initial: $(GCC_INITIAL_BUILD)/.built
 	echo "Installing Initial GCC"
 	cd $(GCC_INITIAL_BUILD) && \
-	PATH=$(TOOLS_DIR)/bin:$$PATH \
-	$(MAKE) install \
-	> /dev/null
+	PATH=$(TOOLS)/bin:$$PATH $(MAKE) install > /dev/null
+	touch $@
+
+
+# Intermediate GCC: configure
+$(GCC_INTERMEDIATE_BUILD)/.configured: $(TOOLS)/.gcc-initial $(SYSROOT)/.glibc-initial $(GCC_INTERMEDIATE_BUILD)/.dir
+	echo "Configuring Intermediate GCC"
+	cd $(GCC_INTERMEDIATE_BUILD) && \
+	$(GCC_SRC)/configure \
+		--target=$(TARGET) \
+		--prefix=$(TOOLS) \
+		--disable-nls \
+		--with-sysroot=$(SYSROOT) \
+		--disable-libssp --disable-libgomp --disable-libmudflap \
+		--disable-libquadmath --disable-libffi \
+		--enable-languages=c \
+	> /dev/null 2>&1
+	touch $@
+
+# Intermediate GCC: build
+$(GCC_INTERMEDIATE_BUILD)/.built: $(GCC_INTERMEDIATE_BUILD)/.configured
+	echo "Building Intermediate GCC"
+	cd $(GCC_INTERMEDIATE_BUILD) && \
+	PATH=$(TOOLS)/bin:$$PATH $(MAKE) > build.log 2>&1
+	touch $@
+
+# Intermediate GCC: install
+$(TOOLS)/.gcc-intermediate: $(GCC_INTERMEDIATE_BUILD)/.built
+	echo "Installing Intermediate GCC"
+	cd $(GCC_INTERMEDIATE_BUILD) && \
+	PATH=$(TOOLS)/bin:$$PATH $(MAKE) install > /dev/null
 	touch $@
 
 
@@ -150,20 +177,20 @@ $(TOOLS_DIR)/.gcc-initial: $(GCC_INITIAL_BUILD)/.built
 #####################################################################
 
 # Kernel: download
-$(DL_DIR)/linux-kronos.git/HEAD: $(DL_DIR)/.dir
+$(DL)/linux-kronos.git/HEAD: $(DL)/.dir
 	echo "Cloning Linux repository"
-	git clone --bare --quiet $(KERNEL_REPO) $(DL_DIR)/linux-kronos.git
+	git clone --bare --quiet $(KERNEL_REPO) $(DL)/linux-kronos.git
 
 # Kernel: clone to src
-$(KERNEL_SRC)/.git/HEAD: $(DL_DIR)/linux-kronos.git/HEAD
+$(KERNEL_SRC)/.git/HEAD: $(DL)/linux-kronos.git/HEAD
 	echo "Checking out Kernel sources"
-	git clone --quiet $(DL_DIR)/linux-kronos.git $(KERNEL_SRC)
+	git clone --quiet $(DL)/linux-kronos.git $(KERNEL_SRC)
 
 # Kernel install
 $(SYSROOT)/.linux-headers: $(KERNEL_SRC)/.git/HEAD
 	echo "Installing Linux headers"
 	cd $(KERNEL_SRC) && \
-	PATH=$(TOOLS_DIR)/bin:$$PATH \
+	PATH=$(TOOLS)/bin:$$PATH \
 	$(MAKE) headers_install \
 		ARCH=$(ARCH) CROSS_COMPILE=$(TARGET)- \
 		INSTALL_HDR_PATH=$(SYSROOT)/usr \
@@ -177,38 +204,39 @@ gcc-initial-clean:
 # glibc
 #####################################################################
 
-glibc-initial: $(SYSROOT)/.glibc-headers $(SYSROOT)/.glibc-startup-files $(SYSROOT)/.dummy-libc # $(TOOLS_DIR)/.glibc-initial
+$(SYSROOT)/.glibc-initial: $(SYSROOT)/.glibc-headers $(SYSROOT)/.glibc-startup-files $(SYSROOT)/.dummy-libc
+	touch $@
 
 # glibc: download
-$(DL_DIR)/$(GLIBC_ARCHIVE): $(DL_DIR)/.dir
+$(DL)/$(GLIBC_ARCHIVE): $(DL)/.dir
 	echo "Downloading glibc"
-	wget --quiet -O $(DL_DIR)/$(GLIBC_ARCHIVE) "$(GLIBC_URL)"
+	wget --quiet -O $(DL)/$(GLIBC_ARCHIVE) "$(GLIBC_URL)"
 	touch $@
 
 # glibc: extract
-$(GLIBC_SRC)/.dir: $(DL_DIR)/$(GLIBC_ARCHIVE) $(SRC_DIR)/.dir
+$(GLIBC_SRC)/.dir: $(DL)/$(GLIBC_ARCHIVE) $(SRC)/.dir
 	echo "Extracting glibc"
-	cd $(SRC_DIR) && tar xvf $< > /dev/null
+	cd $(SRC) && tar xvf $< > /dev/null
 	touch $@
 
 # glibc: patch
 $(GLIBC_SRC)/.patched: $(GLIBC_SRC)/.dir
 	echo "Patching glibc"
 	cd $(GLIBC_SRC) && \
-	QUILT_PATCHES=$(PATCH_DIR)/glibc \
+	QUILT_PATCHES=$(PATCHES)/glibc \
 	quilt push -aq \
 	> /dev/null
 	touch $@
 
 # Initial glibc: configure
-$(GLIBC_INITIAL_BUILD)/.configured: $(GLIBC_INITIAL_BUILD)/.dir $(GLIBC_SRC)/.patched $(TOOLS_DIR)/.binutils $(TOOLS_DIR)/bin/makeinfo
+$(GLIBC_INITIAL_BUILD)/.configured: $(TOOLS)/.gcc-initial $(GLIBC_INITIAL_BUILD)/.dir $(GLIBC_SRC)/.patched $(TOOLS)/.binutils $(TOOLS)/bin/makeinfo
 	echo "Configuring glibc"
 	cd $(GLIBC_INITIAL_BUILD) && \
 	BUILD_CC=gcc \
-	CC=$(TOOLS_DIR)/bin/$(TARGET)-gcc \
-	CXX=$(TOOLS_DIR)/bin/$(TARGET)-g++ \
-	AR=$(TOOLS_DIR)/bin/$(TARGET)-ar \
-	RANLIB=$(TOOLS_DIR)/bin/$(TARGET)-ranlib \
+	CC=$(TOOLS)/bin/$(TARGET)-gcc \
+	CXX=$(TOOLS)/bin/$(TARGET)-g++ \
+	AR=$(TOOLS)/bin/$(TARGET)-ar \
+	RANLIB=$(TOOLS)/bin/$(TARGET)-ranlib \
 	$(GLIBC_SRC)/configure \
 		--host=$(TARGET) \
 		--prefix=/usr \
@@ -225,6 +253,8 @@ $(SYSROOT)/.glibc-headers: $(GLIBC_INITIAL_BUILD)/.configured $(SYSROOT)/.linux-
 	$(MAKE) install-headers install_root=$(SYSROOT) \
 		install-bootstrap-headers=yes \
 	> install-headers.log 2>&1
+	touch $(SYSROOT)/usr/include/gnu/stubs.h
+	cp $(GLIBC_INITIAL_BUILD)/bits/stdio_lim.h $(SYSROOT)/usr/include/bits
 	touch $@
 
 # Initial glibc: headers
@@ -237,12 +267,11 @@ $(SYSROOT)/.glibc-startup-files: $(SYSROOT)/.glibc-headers $(SYSROOT)/usr/lib/.d
 # Initial glibc: dummy libc.so
 $(SYSROOT)/.dummy-libc: $(GLIBC_INITIAL_BUILD)/.configured $(SYSROOT)/usr/lib/.dir
 	echo "Creating dummy libc"
-	$(TOOLS_DIR)/bin/$(TARGET)-gcc -nostdlib -nostartfiles -shared -x c /dev/null \
+	$(TOOLS)/bin/$(TARGET)-gcc -nostdlib -nostartfiles -shared -x c /dev/null \
 		-o $(SYSROOT)/usr/lib/libc.so
 	touch $@
 
 clean: binutils-clean gcc-initial-clean
 
 cleanall:
-	rm -rf $(WORK_DIR)
-
+	rm -rf $(WORK)
