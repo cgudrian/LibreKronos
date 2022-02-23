@@ -6,7 +6,7 @@ ARCH = x86
 
 PATCHES = $(CURDIR)/patches
 WORK = $(CURDIR)/work
-DL = $(WORK)/downloads
+DL = $(CURDIR)/.downloads
 SRC = $(WORK)/src
 BUILD_DIR = $(WORK)/build
 TOOLS = $(WORK)/tools
