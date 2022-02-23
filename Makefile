@@ -1,5 +1,5 @@
 .SILENT:
-.PHONY: all gcc-initial binutils
+.PHONY: all
 
 TARGET = i686-kronos-linux-gnu
 ARCH = x86
@@ -24,19 +24,20 @@ GCC_URL = https://ftp.gnu.org/gnu/gcc/gcc-$(GCC_VERSION)/$(GCC_ARCHIVE)
 GCC_SRC = $(SRC)/gcc-$(GCC_VERSION)
 GCC_INITIAL_BUILD = $(BUILD_DIR)/gcc-initial
 GCC_INTERMEDIATE_BUILD = $(BUILD_DIR)/gcc-intermediate
+GCC_BUILD = $(BUILD_DIR)/gcc
 
 GLIBC_VERSION = 2.13
 GLIBC_ARCHIVE = glibc-$(GLIBC_VERSION).tar.bz2
 GLIBC_URL = https://ftp.gnu.org/gnu/glibc/$(GLIBC_ARCHIVE)
 GLIBC_SRC = $(SRC)/glibc-$(GLIBC_VERSION)
 GLIBC_INITIAL_BUILD = $(BUILD_DIR)/glibc-initial
+GLIBC_BUILD = $(BUILD_DIR)/glibc
 
 KERNEL_SRC = $(SRC)/linux-kronos
 KERNEL_REPO = https://github.com/cgudrian/linux-kronos.git
 
 
-all: binutils gcc-initial $(SYSROOT)/.linux-headers
-
+all: $(TOOLS)/.gcc
 
 %/.dir:
 	mkdir -p $$(dirname $@)
@@ -171,6 +172,37 @@ $(TOOLS)/.gcc-intermediate: $(GCC_INTERMEDIATE_BUILD)/.built
 	PATH=$(TOOLS)/bin:$$PATH $(MAKE) install > /dev/null
 	touch $@
 
+# GCC: configure
+$(GCC_BUILD)/.configured: $(TOOLS)/.gcc-intermediate $(SYSROOT)/.glibc $(GCC_BUILD)/.dir
+	echo "Configuring GCC"
+	cd $(GCC_BUILD) && \
+	$(GCC_SRC)/configure \
+		--target=$(TARGET) \
+		--prefix=$(TOOLS) \
+		--disable-nls \
+		--with-sysroot=$(SYSROOT) \
+		--enable-__cxa_atexit \
+		--disable-libssp --disable-libgomp --disable-libmudflap \
+		--enable-languages=c \
+	> /dev/null 2>&1
+	touch $@
+
+# GCC: build
+$(GCC_BUILD)/.built: $(GCC_BUILD)/.configured
+	echo "Building GCC"
+	cd $(GCC_BUILD) && \
+	PATH=$(TOOLS)/bin:$$PATH $(MAKE) > build.log 2>&1
+	touch $@
+
+# GCC: install
+$(TOOLS)/.gcc: $(GCC_BUILD)/.built
+	echo "Installing GCC"
+	cd $(GCC_BUILD) && \
+	PATH=$(TOOLS)/bin:$$PATH $(MAKE) install > /dev/null
+	cp -d $(TOOLS)/$(TARGET)/lib/libgcc_s.so* $(SYSROOT)/lib
+	# cp -d $(TOOLS)/$(TARGET)/lib/libstdc++.so* $(SYSROOT)/lib
+	touch $@
+
 
 #####################################################################
 # Linux
@@ -229,8 +261,8 @@ $(GLIBC_SRC)/.patched: $(GLIBC_SRC)/.dir
 	touch $@
 
 # Initial glibc: configure
-$(GLIBC_INITIAL_BUILD)/.configured: $(TOOLS)/.gcc-initial $(GLIBC_INITIAL_BUILD)/.dir $(GLIBC_SRC)/.patched $(TOOLS)/.binutils $(TOOLS)/bin/makeinfo
-	echo "Configuring glibc"
+$(GLIBC_INITIAL_BUILD)/.configured: $(TOOLS)/.gcc-initial $(GLIBC_INITIAL_BUILD)/.dir $(GLIBC_SRC)/.patched
+	echo "Configuring Intermediate glibc"
 	cd $(GLIBC_INITIAL_BUILD) && \
 	BUILD_CC=gcc \
 	CC=$(TOOLS)/bin/$(TARGET)-gcc \
@@ -270,6 +302,39 @@ $(SYSROOT)/.dummy-libc: $(GLIBC_INITIAL_BUILD)/.configured $(SYSROOT)/usr/lib/.d
 	$(TOOLS)/bin/$(TARGET)-gcc -nostdlib -nostartfiles -shared -x c /dev/null \
 		-o $(SYSROOT)/usr/lib/libc.so
 	touch $@
+
+# glibc: configure
+$(GLIBC_BUILD)/.configured: $(TOOLS)/.gcc-initial $(GLIBC_BUILD)/.dir $(TOOLS)/.gcc-intermediate
+	echo "Configuring glibc"
+	cd $(GLIBC_BUILD) && \
+	BUILD_CC=gcc \
+	CC="$(TOOLS)/bin/$(TARGET)-gcc -U__i686" \
+	CXX=$(TOOLS)/bin/$(TARGET)-g++ \
+	AR=$(TOOLS)/bin/$(TARGET)-ar \
+	RANLIB=$(TOOLS)/bin/$(TARGET)-ranlib \
+	$(GLIBC_SRC)/configure \
+		--host=$(TARGET) \
+		--prefix=/usr \
+		--with-headers=$(SYSROOT)/usr/include \
+		--disable-profile --without-gd --without-cvs \
+		--enable-add-ons=nptl,libidn \
+	> /dev/null 2>&1
+	touch $@
+
+# glibc: build
+$(GLIBC_BUILD)/.built: $(GLIBC_BUILD)/.configured
+	echo "Building glibc"
+	cd $(GLIBC_BUILD) && \
+	PATH=$(TOOLS)/bin:$$PATH $(MAKE) > build.log 2>&1
+	touch $@
+
+# glibc: install
+$(SYSROOT)/.glibc: $(GLIBC_BUILD)/.built
+	echo "Installing glibc"
+	cd $(GLIBC_BUILD) && \
+	PATH=$(TOOLS)/bin:$$PATH $(MAKE) install install_root=$(SYSROOT) > install.log 2>&1
+	touch $@
+
 
 clean: binutils-clean gcc-initial-clean
 
