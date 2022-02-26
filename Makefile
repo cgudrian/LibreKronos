@@ -264,7 +264,7 @@ $(GLIBC_SRC)/.patched: $(GLIBC_SRC)/.dir
 $(GLIBC_INITIAL_BUILD)/.configured: $(HOST_SYSROOT)/.gcc-initial $(GLIBC_INITIAL_BUILD)/.dir $(GLIBC_SRC)/.patched
 	echo "Configuring Intermediate glibc"
 	cd $(GLIBC_INITIAL_BUILD) && \
-	BUILD_CC=gcc \
+	BUILD_CC=$(CC) \
 	CC=$(HOST_SYSROOT)/bin/$(TARGET)-gcc \
 	CXX=$(HOST_SYSROOT)/bin/$(TARGET)-g++ \
 	AR=$(HOST_SYSROOT)/bin/$(TARGET)-ar \
@@ -307,7 +307,7 @@ $(TARGET_SYSROOT)/.dummy-libc: $(GLIBC_INITIAL_BUILD)/.configured $(TARGET_SYSRO
 $(GLIBC_BUILD)/.configured: $(HOST_SYSROOT)/.gcc-initial $(GLIBC_BUILD)/.dir $(HOST_SYSROOT)/.gcc-intermediate
 	echo "Configuring glibc"
 	cd $(GLIBC_BUILD) && \
-	BUILD_CC=gcc \
+	BUILD_CC=$(CC) \
 	CC="$(HOST_SYSROOT)/bin/$(TARGET)-gcc -U__i686" \
 	CXX=$(HOST_SYSROOT)/bin/$(TARGET)-g++ \
 	AR=$(HOST_SYSROOT)/bin/$(TARGET)-ar \
