@@ -125,7 +125,7 @@ $(GCC_INITIAL_BUILD)/.configured: $(GCC_INITIAL_BUILD)/.dir $(GCC_SRC) $(HOST_SY
 		--disable-libgomp --disable-libmudflap --disable-libquadmath \
 		--disable-decimal-float --disable-libffi \
 		--enable-languages=c \
-	> /dev/null 2>&1
+		> /dev/null 2>&1
 	touch $@
 
 # Initial GCC: build
@@ -142,6 +142,8 @@ $(HOST_SYSROOT)/.gcc-initial: $(GCC_INITIAL_BUILD)/.built
 	PATH=$(HOST_SYSROOT)/bin:$$PATH $(MAKE) install > /dev/null
 	touch $@
 
+gcc-initial-clean:
+	rm -rf $(GCC_INITIAL_BUILD)
 
 # Intermediate GCC: configure
 $(GCC_INTERMEDIATE_BUILD)/.configured: $(HOST_SYSROOT)/.gcc-initial $(TARGET_SYSROOT)/.glibc-initial $(GCC_INTERMEDIATE_BUILD)/.dir
@@ -155,7 +157,7 @@ $(GCC_INTERMEDIATE_BUILD)/.configured: $(HOST_SYSROOT)/.gcc-initial $(TARGET_SYS
 		--disable-libssp --disable-libgomp --disable-libmudflap \
 		--disable-libquadmath --disable-libffi \
 		--enable-languages=c \
-	> /dev/null 2>&1
+		> /dev/null 2>&1
 	touch $@
 
 # Intermediate GCC: build
@@ -184,7 +186,7 @@ $(GCC_BUILD)/.configured: $(HOST_SYSROOT)/.gcc-intermediate $(TARGET_SYSROOT)/.g
 		--enable-__cxa_atexit \
 		--disable-libssp --disable-libgomp --disable-libmudflap \
 		--enable-languages=c \
-	> /dev/null 2>&1
+		> /dev/null 2>&1
 	touch $@
 
 # GCC: build
@@ -226,11 +228,8 @@ $(TARGET_SYSROOT)/.linux-headers: $(KERNEL_SRC)/.git/HEAD
 	$(MAKE) headers_install \
 		ARCH=$(ARCH) CROSS_COMPILE=$(TARGET)- \
 		INSTALL_HDR_PATH=$(TARGET_SYSROOT)/usr \
-	> /dev/null 2>&1
+		> /dev/null 2>&1
 	touch $@
-
-gcc-initial-clean:
-	rm -rf $(GCC_INITIAL_BUILD)
 
 #####################################################################
 # glibc
@@ -257,7 +256,7 @@ $(GLIBC_SRC)/.patched: $(GLIBC_SRC)/.dir
 	cd $(GLIBC_SRC) && \
 	QUILT_PATCHES=$(PATCHES)/glibc \
 	quilt push -aq \
-	> /dev/null
+		> /dev/null
 	touch $@
 
 # Initial glibc: configure
@@ -273,18 +272,21 @@ $(GLIBC_INITIAL_BUILD)/.configured: $(HOST_SYSROOT)/.gcc-initial $(GLIBC_INITIAL
 		--host=$(TARGET) \
 		--prefix=/usr \
 		--with-headers=$(TARGET_SYSROOT)/usr/include \
-		--disable-profile --without-gd --without-cvs \
+		--disable-profile \
+		--without-gd \
+		--without-cvs \
 		--enable-add-ons=nptl,libidn \
-	> /dev/null 2>&1
+		> /dev/null 2>&1
 	touch $@
 
 # Initial glibc: headers
 $(TARGET_SYSROOT)/.glibc-headers: $(GLIBC_INITIAL_BUILD)/.configured $(TARGET_SYSROOT)/.linux-headers
 	echo "Installing glibc headers"
 	cd $(GLIBC_INITIAL_BUILD) && \
-	$(MAKE) install-headers install_root=$(TARGET_SYSROOT) \
+	$(MAKE) install-headers \
+		install_root=$(TARGET_SYSROOT) \
 		install-bootstrap-headers=yes \
-	> install-headers.log 2>&1
+		> install-headers.log 2>&1
 	touch $(TARGET_SYSROOT)/usr/include/gnu/stubs.h
 	cp $(GLIBC_INITIAL_BUILD)/bits/stdio_lim.h $(TARGET_SYSROOT)/usr/include/bits
 	touch $@
@@ -299,7 +301,11 @@ $(TARGET_SYSROOT)/.glibc-startup-files: $(TARGET_SYSROOT)/.glibc-headers $(TARGE
 # Initial glibc: dummy libc.so
 $(TARGET_SYSROOT)/.dummy-libc: $(GLIBC_INITIAL_BUILD)/.configured $(TARGET_SYSROOT)/usr/lib/.dir
 	echo "Creating dummy libc"
-	$(HOST_SYSROOT)/bin/$(TARGET)-gcc -nostdlib -nostartfiles -shared -x c /dev/null \
+	$(HOST_SYSROOT)/bin/$(TARGET)-gcc \
+		-nostdlib \
+		-nostartfiles \
+		-shared \
+		-x c /dev/null \
 		-o $(TARGET_SYSROOT)/usr/lib/libc.so
 	touch $@
 
@@ -318,7 +324,7 @@ $(GLIBC_BUILD)/.configured: $(HOST_SYSROOT)/.gcc-initial $(GLIBC_BUILD)/.dir $(H
 		--with-headers=$(TARGET_SYSROOT)/usr/include \
 		--disable-profile --without-gd --without-cvs \
 		--enable-add-ons=nptl,libidn \
-	> /dev/null 2>&1
+		> /dev/null 2>&1
 	touch $@
 
 # glibc: build
